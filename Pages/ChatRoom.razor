@@ -1,6 +1,6 @@
 @page "/chatroom"
 @inject NavigationManager navigationManager
-@inject UserService userService
+@inject UserService service
 @using BlazorChat.Data;
 @using Microsoft.AspNetCore.SignalR.Client;
 
@@ -48,9 +48,15 @@ else
             }
         }
         <hr />
-        <textarea class="input-lg" placeholder="enter your comment" @bind="@_newMessage"></textarea>
+        <textarea class="input-lg" placeholder="Enter your comment" @bind="@_newMessage"></textarea>
         <button class="btn btn-primary" @onclick="@(() => SendAsync(_newMessage))">Send</button>
-        
+        <select class="form-select" @bind="@_to">
+            <option value="All">All</option>
+            @foreach (var user in service.GetAll())
+            {
+                <option value="@user.Username">@user.Username</option>
+            }
+        </select>
     </div>
 
 }
@@ -108,7 +114,7 @@ else
             await _hubConnection.StartAsync();
 
             // Add user to the user service
-            userService.Add(_username, _hubConnection.ConnectionId);
+            service.Add(_username, _hubConnection.ConnectionId);
 
             await SendAsync($"[Notice] {_username} joined chat room.");
         }
@@ -154,8 +160,15 @@ else
     {
         if (_isChatting && !string.IsNullOrWhiteSpace(message))
         {
-            await _hubConnection.SendAsync("Broadcast", _username, message);
-
+            if (_to == "All")
+            {
+                await _hubConnection.SendAsync("Broadcast", _username, message);
+            }
+            else
+            {
+                var connectionId = service.GetConnectionByName(_to);
+                await _hubConnection.SendAsync("Private", _username, connectionId, message);
+            }
             _newMessage = string.Empty;
         }
     }
