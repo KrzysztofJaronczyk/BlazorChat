@@ -83,7 +83,7 @@ else
 
     public async Task Chat()
     {
-        // check username is valid
+    // check username is valid
         if (string.IsNullOrWhiteSpace(_username))
         {
             _message = "Please enter a name";
@@ -92,14 +92,14 @@ else
 
         try
         {
-            // Start chatting and force refresh UI, ref: https://github.com/dotnet/aspnetcore/issues/22159
+    // Start chatting and force refresh UI.
             _isChatting = true;
             await Task.Delay(1);
 
-            // remove old messages if any
+    // remove old messages if any
             _messages.Clear();
 
-            // Create the chat client
+    // Create the chat client
             string baseUrl = navigationManager.BaseUri;
 
             _hubUrl = baseUrl.TrimEnd('/') + BlazorChatSampleHub.HubUrl;
@@ -111,18 +111,19 @@ else
             _hubConnection.On<string, string>("Broadcast", BroadcastMessage);
             _hubConnection.On<string, string>("Private", PrivateMessage);
 
-            await _hubConnection.StartAsync();
 
-            // Add user to the user service
-            service.Add(_username, _hubConnection.ConnectionId);
+            await _hubConnection.StartAsync();
+            service.Add(_hubConnection.ConnectionId, _username);
 
             await SendAsync($"[Notice] {_username} joined chat room.");
+
         }
         catch (Exception e)
         {
             _message = $"ERROR: Failed to start chat client: {e.Message}";
             _isChatting = false;
         }
+
     }
 
 
@@ -132,13 +133,7 @@ else
 
         _messages.Add(new Message(name, message, isMine));
 
-        // Inform blazor the UI needs updating
-        StateHasChanged();
-    }
-
-    private void PrivateMessage(string name, string message)
-    {
-        _messages.Add(new Message(name, $"[Private]: {message}", false));
+    // Inform blazor the UI needs updating
         InvokeAsync(StateHasChanged);
     }
 
@@ -153,6 +148,7 @@ else
 
             _hubConnection = null;
             _isChatting = false;
+            service.RemoveByName(username: _username);
         }
     }
 
@@ -160,18 +156,26 @@ else
     {
         if (_isChatting && !string.IsNullOrWhiteSpace(message))
         {
-            if (_to == "All")
+            if(_to == "All")
             {
                 await _hubConnection.SendAsync("Broadcast", _username, message);
             }
             else
             {
-                var connectionId = service.GetConnectionByName(_to);
-                await _hubConnection.SendAsync("Private", _username, connectionId, message);
+                var connnectionId = service.GetConnectionIdByName(_to);
+                await _hubConnection.SendAsync("Private", _username , connnectionId ,message);
             }
             _newMessage = string.Empty;
         }
+
     }
+    private void PrivateMessage(string name, string message)
+    {
+        _messages.Add(new Message(name, $"[Private]: {message}", false));
+
+        InvokeAsync(StateHasChanged);
+    }
+
 
     private class Message
     {
